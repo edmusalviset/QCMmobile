@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Correction QCM — tactile / piano</title>
+<style>
+  :root{
+    --bg:#14171c;
+    --panel:#1c2028;
+    --panel2:#20242e;
+    --border:#333a48;
+    --text:#e8eaf0;
+    --muted:#8891a5;
+    --accent:#3fd0c9;
+    --red:#e6483f;
+    --green:#3fc26b;
+    --amber:#e6b93f;
+    --mono:'Courier New', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0; height:100%; overflow:hidden;}
+  body{
+    background:radial-gradient(1200px 800px at 20% -10%, #1c2230 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    display:flex; flex-direction:column;
+    height:100dvh;
+    touch-action:manipulation;
+    user-select:none;
+  }
+
+  /* ---------- en-tête compact ---------- */
+  header{
+    flex:0 0 auto;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+  }
+  header h1{
+    font-size:.95rem;
+    letter-spacing:.04em;
+    color:var(--accent);
+    text-transform:uppercase;
+    margin:0;
+  }
+  header .icons{display:flex; gap:6px;}
+  header button{
+    background:var(--panel2);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 9px;
+    font-size:1rem;
+    line-height:1;
+  }
+  header button:active{border-color:var(--accent);}
+
+  .legend{
+    flex:0 0 auto;
+    font-size:.66rem;
+    color:var(--muted);
+    text-align:center;
+    padding:2px 8px 6px;
+    border-bottom:1px solid var(--border);
+  }
+  .legend b{color:var(--amber);}
+
+  /* ---------- zone scrollable : résultats + badges + tableaux ---------- */
+  main{
+    flex:1 1 auto;
+    overflow-y:auto;
+    padding:10px 10px 14px;
+  }
+
+  .results{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .result-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:9px 10px;
+    text-align:center;
+    transition:.2s;
+  }
+  .result-card.empty{opacity:.35;}
+  .result-card.latest{
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent);
+    background:linear-gradient(160deg, rgba(63,208,201,.14), var(--panel) 70%);
+  }
+  .result-card .rtitle{font-size:.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+  .result-card .note{font-size:1.5rem; font-weight:800; color:var(--accent); font-family:var(--mono); line-height:1.2;}
+  .result-card .errs{font-size:.66rem; color:var(--red); font-weight:700; margin-top:2px;}
+  .result-card .errs.none{color:var(--green);}
+
+  .version-block{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:10px;
+    margin-bottom:10px;
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+  }
+
+  .badge{
+    flex:0 0 auto;
+    width:64px; height:64px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:var(--mono);
+    font-size:1.3rem;
+    font-weight:800;
+    background:var(--panel2);
+    border:2px solid var(--border);
+    border-radius:12px;
+    color:var(--text);
+    transition:.15s;
+  }
+  .badge:active{transform:scale(.94);}
+  .badge.correction{ background:var(--red); border-color:var(--red); color:#fff; box-shadow:0 0 16px rgba(230,72,63,.5);}
+  .badge.reponses{ background:var(--green); border-color:var(--green); color:#0a1a10; box-shadow:0 0 16px rgba(63,194,107,.5);}
+  .badge .sub{font-size:.55rem; font-weight:500; text-transform:uppercase; margin-top:2px; letter-spacing:.03em;}
+
+  .table-wrap{flex:1; overflow-x:auto; min-width:0;}
+  table{border-collapse:collapse; font-family:var(--mono); width:max-content;}
+  td{
+    border:1px solid var(--border);
+    min-width:30px; height:28px;
+    text-align:center;
+    padding:0 5px;
+    font-size:.78rem;
+    white-space:nowrap;
+  }
+  tr.numrow td{color:var(--muted); font-size:.64rem; background:var(--panel2);}
+  tr.corrow td{color:var(--amber); font-weight:700;}
+  tr.corrow td.blank{color:var(--border); font-weight:400;}
+  tr.reprow td.ok{color:var(--green); font-weight:700;}
+  tr.reprow td.bad{color:var(--red); font-weight:700; background:rgba(230,72,63,.08);}
+  tr.reprow td.blank{color:var(--muted);}
+
+  .log{
+    font-family:var(--mono);
+    font-size:.62rem;
+    color:var(--muted);
+    max-height:70px;
+    overflow-y:auto;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 8px;
+  }
+  .log div{margin-bottom:1px;}
+  .log b{color:var(--accent);}
+
+  /* ---------- clavier piano, ancré en bas ---------- */
+  .piano-wrap{
+    flex:0 0 auto;
+    background:#0d0f13;
+    border-top:1px solid var(--border);
+    padding:8px 0 max(8px, env(safe-area-inset-bottom));
+    display:flex;
+    justify-content:center;
+  }
+  .piano{
+    position:relative;
+    display:flex;
+  }
+  .wkey{
+    width:22mm;
+    height:70mm;
+    background:linear-gradient(180deg, #f4f4f2, #dcdcda);
+    border:1px solid #111;
+    border-radius:0 0 6px 6px;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding-bottom:8px;
+    font-family:var(--mono);
+    font-size:.72rem;
+    font-weight:700;
+    color:#333;
+    position:relative;
+    box-shadow:inset 0 -6px 8px rgba(0,0,0,.08);
+  }
+  .wkey + .wkey{border-left:none;}
+  .wkey:active, .wkey.pressed{
+    background:linear-gradient(180deg, #cfe9e6, #a9d9d4);
+  }
+  .wkey.action-key{color:#0a5c56;}
+  .wkey .lbl{pointer-events:none;}
+  .wkey .action-lbl{
+    position:absolute; top:6px; left:0; right:0;
+    text-align:center; font-size:.58rem; color:#0a5c56; font-weight:800;
+  }
+
+  .bkey{
+    position:absolute; top:0;
+    width:13mm;
+    height:46mm;
+    background:linear-gradient(180deg, #2a2a2a, #050505);
+    border:1px solid #000;
+    border-radius:0 0 4px 4px;
+    z-index:2;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding-bottom:6px;
+    font-family:var(--mono);
+    font-size:.6rem;
+    font-weight:700;
+    color:#e6b93f;
+  }
+  .bkey:active, .bkey.pressed{ background:linear-gradient(180deg, #3a3a3a, #151515); }
+  .bkey.inert{color:#555;}
+
+  .wkey.inert{color:#888;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Correction QCM — tactile</h1>
+  <div class="icons">
+    <button id="saveBtn" title="Sauvegarder le corrigé">💾</button>
+    <button id="loadBtn" title="Charger un corrigé">📂</button>
+    <input id="loadInput" type="file" accept="application/json,.json" style="display:none;">
+    <button id="resetBtn" title="Réinitialiser">⟲</button>
+  </div>
+</header>
+
+<div class="legend">
+  Identifiant : <b>1 clic</b> = saisir les réponses (vert) · <b>double clic</b> = saisir le corrigé (rouge) · <b>1 clic</b> pour terminer&nbsp;&nbsp;|&nbsp;&nbsp;
+  Clavier : <b>A/B/C/D</b> = réponses A/B/C/D · <b>C♯</b> = non répondu · <b>E</b> = corriger (annule) · <b>G grave</b> = terminer + relecture
+</div>
+
+<main id="main">
+  <div class="results" id="results"></div>
+  <div id="versions"></div>
+  <div class="log" id="log"><div><b>Journal</b> — prêt.</div></div>
+</main>
+
+<div class="piano-wrap">
+  <div class="piano" id="piano"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const VERSIONS = ["V1","V2","V3"];
+  const LETTERS = ["A","B","C","D","X"];
+
+  const state = {};
+  VERSIONS.forEach(v => state[v] = { correction: [], reponses: [] });
+
+  let mode = null; // { version, type: 'correction'|'reponses' }
+  let lastTouchedVersion = null;
+
+  // ---------- éléments ----------
+  const resultsEl = document.getElementById('results');
+  const versionsEl = document.getElementById('versions');
+  const logEl = document.getElementById('log');
+
+  function log(msg, strong){
+    const d = document.createElement('div');
+    d.innerHTML = strong ? `<b>${strong}</b> ${msg}` : msg;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+    while (logEl.children.length > 40) logEl.removeChild(logEl.firstChild);
+  }
+
+  // ---------- calculs ----------
+  function computeResult(v){
+    const c = state[v].correction, r = state[v].reponses;
+    if (c.length === 0) return null;
+    const total = c.length;
+    let correct = 0;
+    const wrong = [];
+    for (let i=0;i<total;i++){
+      if (r[i] && r[i] === c[i]) correct++;
+      else wrong.push(i+1);
+    }
+    let note = Math.ceil((correct/total)*20*2)/2;
+    if (isNaN(note)) note = 0;
+    return { total, correct, wrong, note };
+  }
+  function fmtNote(n){ return String(n).replace('.', ',') + '/20'; }
+
+  // ---------- rendu ----------
+  function render(){
+    resultsEl.innerHTML = '';
+    VERSIONS.forEach(v => {
+      const res = computeResult(v);
+      const card = document.createElement('div');
+      card.className = 'result-card' + (res ? '' : ' empty') + (v === lastTouchedVersion ? ' latest' : '');
+      if (!res){
+        card.innerHTML = `<div class="rtitle">${v}</div><div class="errs">en attente</div>`;
+      } else {
+        card.innerHTML = `
+          <div class="rtitle">${v}</div>
+          <div class="note">${fmtNote(res.note)}</div>
+          <div class="errs ${res.wrong.length ? '' : 'none'}">${res.wrong.length ? res.wrong.join(', ') : 'OK'}</div>
+        `;
+      }
+      resultsEl.appendChild(card);
+    });
+
+    versionsEl.innerHTML = '';
+    VERSIONS.forEach(v => {
+      const c = state[v].correction, r = state[v].reponses;
+      const nCols = Math.max(c.length, r.length, 1);
+
+      const block = document.createElement('div');
+      block.className = 'version-block';
+
+      const isCorrActive = mode && mode.version === v && mode.type === 'correction';
+      const isRepActive  = mode && mode.version === v && mode.type === 'reponses';
+
+      const badge = document.createElement('div');
+      badge.className = 'badge ' + (isCorrActive ? 'correction' : '') + (isRepActive ? 'reponses' : '');
+      badge.innerHTML = `<div>${v}</div><div class="sub">${isCorrActive ? 'corrigé…' : (isRepActive ? 'réponses…' : 'appui')}</div>`;
+      attachBadgeEvents(badge, v);
+      block.appendChild(badge);
+
+      const tw = document.createElement('div');
+      tw.className = 'table-wrap';
+      const table = document.createElement('table');
+      const numRow = document.createElement('tr'); numRow.className='numrow';
+      const corRow = document.createElement('tr'); corRow.className='corrow';
+      const repRow = document.createElement('tr'); repRow.className='reprow';
+
+      for (let i=0;i<nCols;i++){
+        const tdNum = document.createElement('td'); tdNum.textContent = i+1;
+        numRow.appendChild(tdNum);
+
+        const tdCor = document.createElement('td');
+        tdCor.textContent = c[i] || '·';
+        if (!c[i]) tdCor.classList.add('blank');
+        tdCor.addEventListener('click', () => cycleCell(v,'correction',i));
+        corRow.appendChild(tdCor);
+
+        const tdRep = document.createElement('td');
+        tdRep.textContent = r[i] || '·';
+        if (r[i] && c[i]) tdRep.classList.add(r[i]===c[i] ? 'ok' : 'bad');
+        else tdRep.classList.add('blank');
+        tdRep.addEventListener('click', () => cycleCell(v,'reponses',i));
+        repRow.appendChild(tdRep);
+      }
+
+      table.appendChild(numRow);
+      table.appendChild(corRow);
+      table.appendChild(repRow);
+      tw.appendChild(table);
+      block.appendChild(tw);
+
+      versionsEl.appendChild(block);
+    });
+  }
+
+  function cycleCell(v, type, i){
+    const arr = state[v][type];
+    const cur = arr[i];
+    const idx = cur ? LETTERS.indexOf(cur) : -1;
+    if (idx === LETTERS.length - 1){
+      arr[i] = undefined;
+      while (arr.length && arr[arr.length-1] === undefined) arr.pop();
+    } else {
+      arr[i] = LETTERS[idx+1];
+    }
+    render();
+  }
+
+  // ---------- badges V1/V2/V3 : simple clic = réponses, double clic = corrigé ----------
+  const clickTimers = {};
+  function attachBadgeEvents(el, v){
+    el.addEventListener('click', () => {
+      if (clickTimers[v]) return; // un double-clic est en cours de détection
+      clickTimers[v] = setTimeout(() => {
+        clickTimers[v] = null;
+        onBadgeSingle(v);
+      }, 260);
+    });
+    el.addEventListener('dblclick', () => {
+      clearTimeout(clickTimers[v]);
+      clickTimers[v] = null;
+      onBadgeDouble(v);
+    });
+  }
+
+  function onBadgeSingle(v){
+    if (mode && mode.version === v){
+      finishDictation();
+    } else if (!mode){
+      startDictation(v, 'reponses');
+    } else {
+      log(`termine d'abord la dictée en cours sur ${mode.version}`);
+    }
+  }
+
+  function onBadgeDouble(v){
+    if (mode && mode.version === v){
+      finishDictation();
+    } else if (!mode){
+      startDictation(v, 'correction');
+    } else {
+      log(`termine d'abord la dictée en cours sur ${mode.version}`);
+    }
+  }
+
+  // ---------- son ----------
+  let actx;
+
+  // Safari iOS bloque le son (WebAudio et synthèse vocale) tant qu'il n'a pas été
+  // débloqué par un tap direct. On profite du tout premier tap sur l'écran pour
+  // "amorcer" les deux, afin que la relecture différée (après un court délai) ne
+  // soit pas silencieusement bloquée la première fois.
+  let audioUnlocked = false;
+  function unlockAudio(){
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try{
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    }catch(e){}
+    if ('speechSynthesis' in window){
+      try{
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        speechSynthesis.speak(u);
+      }catch(e){}
+    }
+  }
+  document.addEventListener('pointerdown', unlockAudio, { once:true, capture:true });
+
+  function tone(freq, durationMs){
+    try{
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.frequency.value = freq || 440;
+      osc.type = 'triangle';
+      const d = (durationMs || 200) / 1000;
+      gain.gain.setValueAtTime(0.001, actx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.18, actx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + d);
+      osc.connect(gain).connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + d + 0.02);
+    }catch(e){}
+  }
+  function alertBeep(){ tone(200,180); setTimeout(()=>tone(200,180), 220); }
+
+  // ---------- dictée ----------
+  function startDictation(version, type){
+    mode = { version, type };
+    lastTouchedVersion = version;
+    state[version][type] = [];
+    tone(type === 'correction' ? 330 : 660, 140);
+    log(`démarrage dictée <b>${type}</b> pour <b>${version}</b>`, '▶');
+    render();
+  }
+
+  function pushLetter(letter){
+    if (!mode) { log(`« ${letter} » ignorée (aucune dictée en cours)`); return; }
+    state[mode.version][mode.type].push(letter);
+    render();
+  }
+
+  function undoLast(){
+    if (!mode) { log('« mi » ignorée (aucune dictée en cours)'); return; }
+    const arr = state[mode.version][mode.type];
+    const removed = arr.pop();
+    log(`annulation de la dernière saisie${removed ? ' ('+removed+')' : ''}`, '↺');
+    render();
+  }
+
+  function finishDictation(){
+    if (!mode) return;
+    const finished = mode;
+    const arr = state[finished.version][finished.type].slice();
+
+    if (finished.type === 'reponses'){
+      const corrLen = state[finished.version].correction.length;
+      if (corrLen > 0 && arr.length !== corrLen){
+        log(`⚠ ${arr.length} réponse(s) pour ${corrLen} question(s) au corrigé — dictée à recommencer`, '⚠');
+        alertBeep();
+        const msg = arr.length < corrLen
+          ? `Attention, il manque des réponses : ${arr.length} sur ${corrLen}. Recommence la dictée de ${finished.version}.`
+          : `Attention, trop de réponses : ${arr.length} pour ${corrLen}. Recommence la dictée de ${finished.version}.`;
+        speak(msg, 1.05);
+        state[finished.version].reponses = [];
+        mode = { version: finished.version, type: 'reponses' };
+        lastTouchedVersion = finished.version;
+        render();
+        return;
+      }
+    }
+
+    log(`fin de dictée pour <b>${finished.version}</b> (${finished.type})`, '■');
+    mode = null;
+    render();
+
+    if (finished.type === 'reponses'){
+      // court délai entre l'appui qui termine la dictée et le début de la relecture
+      setTimeout(() => {
+        playMelody(arr, () => speakBilan(finished.version));
+      }, 500);
+    }
+  }
+
+  // ---------- relecture mélodique + bilan vocal ----------
+  const NOTE_FREQ = { A:440.00, B:493.88, C:523.25, D:587.33, X:554.37 };
+  function playMelody(arr, onDone){
+    if (!arr.length){ onDone && onDone(); return; }
+    let i = 0;
+    function step(){
+      if (i >= arr.length){ setTimeout(() => onDone && onDone(), 260); return; }
+      tone(NOTE_FREQ[arr[i]] || 440, 230);
+      i++;
+      setTimeout(step, 300);
+    }
+    step();
+  }
+
+  function speak(text, rate){
+    if (!('speechSynthesis' in window)) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'fr-FR';
+    utter.rate = rate || 1.1;
+    speechSynthesis.speak(utter);
+  }
+
+  function speakBilan(version){
+    const res = computeResult(version);
+    if (!res) return;
+    const wrongSpoken = res.wrong.length ? `Questions fausses : ${res.wrong.join(', ')}.` : 'Aucune erreur.';
+    const noteSpoken = `Note : ${fmtNote(res.note).replace('/20',' sur 20')}.`;
+    speechSynthesis.cancel();
+    log(`bilan ${version} : ${wrongSpoken} … ${noteSpoken}`, '🔊');
+    if (!('speechSynthesis' in window)) return;
+    const u1 = new SpeechSynthesisUtterance(wrongSpoken);
+    u1.lang = 'fr-FR';
+    u1.rate = 1.3;
+    // pause entre l'énoncé des questions fausses et l'énoncé de la note
+    u1.onend = () => setTimeout(() => speak(noteSpoken, 1.3), 350);
+    speechSynthesis.speak(u1);
+  }
+
+  // ---------- clavier piano ----------
+  // une octave sol→sol (G→G) : touches blanches G A B C D E F G, noires G# A# C# D# F#
+  // notation anglo-saxonne affichée sur les touches ; seul le G grave (premier) termine la dictée
+  const WHITE_NOTES = [
+    { note:'G', label:'G', action:'END' },
+    { note:'A', label:'A', action:'A' },
+    { note:'B', label:'B', action:'B' },
+    { note:'C', label:'C', action:'C' },
+    { note:'D', label:'D', action:'D' },
+    { note:'E', label:'E', action:'UNDO' },
+    { note:'F', label:'F' },
+    { note:'G', label:'G' }
+  ];
+  const BLACK_NOTES = [
+    { after:0, note:'G#', label:'G♯' },
+    { after:1, note:'A#', label:'A♯' },
+    { after:3, note:'C#', label:'C♯', action:'X' },
+    { after:4, note:'D#', label:'D♯' },
+    { after:6, note:'F#', label:'F♯' }
+  ];
+  const KEY_FREQ = {
+    'G':392.00, 'G#':415.30, 'A':440.00, 'A#':466.16, 'B':493.88,
+    'C':523.25, 'C#':554.37, 'D':587.33, 'D#':622.25, 'E':659.25,
+    'F':698.46, 'F#':739.99
+  };
+
+  function handleKeyAction(action){
+    if (!action) return; // touche inerte, juste sonore
+    if (action === 'UNDO') undoLast();
+    else if (action === 'END'){
+      if (mode) finishDictation();
+      else log('« sol » ignoré (aucune dictée en cours)');
+    }
+    else pushLetter(action); // 'A' | 'B' | 'C' | 'D' | 'X'
+  }
+
+  function buildPiano(){
+    const piano = document.getElementById('piano');
+    piano.innerHTML = '';
+    const whiteKeyMM = 22; // largeur d'une touche blanche, en mm (taille réelle)
+
+    WHITE_NOTES.forEach((wn) => {
+      const el = document.createElement('div');
+      el.className = 'wkey' + (wn.action ? ' action-key' : ' inert');
+      el.innerHTML = wn.action
+        ? `<span class="action-lbl">${wn.action === 'UNDO' ? '↺' : (wn.action === 'END' ? '■' : wn.action)}</span><span class="lbl">${wn.label}</span>`
+        : `<span class="lbl">${wn.label}</span>`;
+      el.addEventListener('click', () => {
+        tone(KEY_FREQ[wn.note], 220);
+        el.classList.add('pressed');
+        setTimeout(() => el.classList.remove('pressed'), 140);
+        handleKeyAction(wn.action);
+      });
+      piano.appendChild(el);
+    });
+
+    BLACK_NOTES.forEach((bn) => {
+      const el = document.createElement('div');
+      el.className = 'bkey' + (bn.action ? '' : ' inert');
+      el.textContent = bn.label;
+      el.style.left = ((bn.after + 1) * whiteKeyMM - 6.5) + 'mm';
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tone(KEY_FREQ[bn.note], 220);
+        el.classList.add('pressed');
+        setTimeout(() => el.classList.remove('pressed'), 140);
+        handleKeyAction(bn.action);
+      });
+      piano.appendChild(el);
+    });
+  }
+
+  // ---------- boutons haut de page ----------
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    VERSIONS.forEach(v => { state[v].correction = []; state[v].reponses = []; });
+    mode = null;
+    log('réinitialisation complète', '⟲');
+    render();
+  });
+
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const loadInput = document.getElementById('loadInput');
+
+  saveBtn.addEventListener('click', () => {
+    const hasAny = VERSIONS.some(v => state[v].correction.length > 0);
+    if (!hasAny){ log('rien à sauvegarder'); return; }
+    const stampDefault = new Date().toISOString().slice(0,10);
+    const name = window.prompt('Nom de cette sauvegarde :', stampDefault);
+    if (name === null){ log('sauvegarde annulée'); return; }
+    const label = name.trim() || stampDefault;
+    const payload = {
+      type: 'corrige-qcm', version: 1, name: label, date: new Date().toISOString(),
+      corrections: { V1: state.V1.correction, V2: state.V2.correction, V3: state.V3.correction }
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = label.replace(/[^a-z0-9\- _]/gi, '').trim().replace(/\s+/g, '-') || stampDefault;
+    a.href = url; a.download = `corrige-${safeName}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    log(`corrigé « ${label} » sauvegardé : ${a.download}`, '💾');
+  });
+
+  loadBtn.addEventListener('click', () => loadInput.click());
+  loadInput.addEventListener('change', () => {
+    const file = loadInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const corrections = data && data.corrections ? data.corrections : data;
+        let loaded = 0;
+        VERSIONS.forEach(v => {
+          if (Array.isArray(corrections[v])){
+            const cleaned = corrections[v].map(x => (typeof x === 'string' ? x.toUpperCase() : x)).filter(x => LETTERS.includes(x));
+            if (cleaned.length){ state[v].correction = cleaned; loaded++; }
+          }
+        });
+        if (loaded){
+          lastTouchedVersion = null;
+          const label = data && data.name ? ` « ${data.name} »` : '';
+          log(`corrigé${label} importé pour ${loaded} version(s)`, '📂');
+          render();
+        } else {
+          log('⚠ aucun corrigé valide trouvé dans ce fichier');
+        }
+      } catch(err){
+        log('⚠ échec import : ' + err.message);
+      }
+      loadInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  buildPiano();
+  render();
+})();
+</script>
+</body>
+</html>
