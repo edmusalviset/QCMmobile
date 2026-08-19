@@ -415,15 +415,27 @@
   // ---------- son ----------
   let actx;
 
-  // Correctif connu pour Safari iOS : la synthèse vocale (speechSynthesis) reste parfois
-  // bloquée en file d'attente sans jamais démarrer, même après un tap. Un forçage
-  // pause()/resume() juste après chaque speak() la débloque de façon fiable.
+  // Correctif connu pour Safari/Chrome iOS (même moteur WebKit imposé par Apple) :
+  // speechSynthesis.speak() peut rester bloqué en file d'attente sans jamais déclencher
+  // onstart/onerror. On applique un "réveil" pause()/resume() en boucle courte après
+  // chaque speak(), au lieu d'un simple appel unique.
   function speechKick(){
     try{
       speechSynthesis.pause();
       speechSynthesis.resume();
     }catch(e){}
   }
+  function speechWatchdog(ms){
+    const end = Date.now() + (ms || 2500);
+    const iv = setInterval(() => {
+      speechKick();
+      if (Date.now() > end || !speechSynthesis.speaking) clearInterval(iv);
+    }, 250);
+  }
+
+  // reset de la file d'attente au chargement, au cas où une session précédente
+  // aurait laissé la synthèse vocale dans un état bloqué
+  try{ if ('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
 
   // Safari iOS bloque le son (WebAudio et synthèse vocale) tant qu'il n'a pas été
   // débloqué par un tap direct. On profite du tout premier tap sur l'écran pour
@@ -433,22 +445,32 @@
   function unlockAudio(){
     if (audioUnlocked) return;
     audioUnlocked = true;
+    log('tentative de déblocage audio (premier tap détecté)…', '🔓');
     try{
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') actx.resume();
-    }catch(e){}
+      log('contexte WebAudio : ' + actx.state);
+    }catch(e){ log('⚠ WebAudio indisponible : ' + e.message); }
+
     if ('speechSynthesis' in window){
+      log(`synthèse vocale : voix dispo=${speechSynthesis.getVoices().length}, pending=${speechSynthesis.pending}, speaking=${speechSynthesis.speaking}`);
       try{
-        const u = new SpeechSynthesisUtterance('.');
-        u.volume = 0.01;
-        u.onstart = () => log('synthèse vocale débloquée', '🔓');
+        const u = new SpeechSynthesisUtterance('bonjour');
+        u.lang = 'fr-FR';
+        u.volume = 1;
+        u.rate = 2;
+        u.onstart = () => log('synthèse vocale démarrée avec succès', '✅');
+        u.onend = () => log('synthèse vocale : fin du test de déblocage');
         u.onerror = (e) => log('⚠ synthèse vocale : erreur au déblocage (' + e.error + ')');
         speechSynthesis.speak(u);
-        speechKick();
+        speechWatchdog(3000);
       }catch(e){ log('⚠ synthèse vocale indisponible : ' + e.message); }
+    } else {
+      log('⚠ speechSynthesis absent de ce navigateur');
     }
   }
   document.addEventListener('pointerdown', unlockAudio, { once:true, capture:true });
+  document.addEventListener('touchend', unlockAudio, { once:true, capture:true });
 
   function tone(freq, durationMs){
     try{
@@ -547,7 +569,7 @@
     utter.rate = rate || 1.1;
     utter.onerror = (e) => log('⚠ erreur synthèse vocale : ' + e.error);
     speechSynthesis.speak(utter);
-    speechKick();
+    speechWatchdog(2500);
   }
 
   function speakBilan(version){
@@ -565,7 +587,7 @@
     // pause entre l'énoncé des questions fausses et l'énoncé de la note
     u1.onend = () => setTimeout(() => speak(noteSpoken, 1.3), 350);
     speechSynthesis.speak(u1);
-    speechKick();
+    speechWatchdog(2500);
   }
 
   // ---------- clavier piano ----------
