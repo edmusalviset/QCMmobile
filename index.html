@@ -415,22 +415,17 @@
   // ---------- son ----------
   let actx;
 
-  // Correctif connu pour Safari/Chrome iOS (même moteur WebKit imposé par Apple) :
-  // speechSynthesis.speak() peut rester bloqué en file d'attente sans jamais déclencher
-  // onstart/onerror. On applique un "réveil" pause()/resume() en boucle courte après
-  // chaque speak(), au lieu d'un simple appel unique.
-  function speechKick(){
-    try{
-      speechSynthesis.pause();
-      speechSynthesis.resume();
-    }catch(e){}
-  }
-  function speechWatchdog(ms){
-    const end = Date.now() + (ms || 2500);
-    const iv = setInterval(() => {
-      speechKick();
-      if (Date.now() > end || !speechSynthesis.speaking) clearInterval(iv);
-    }, 250);
+  // Correctif WebKit : un pause()/resume() IMMÉDIAT juste après speak() peut en réalité
+  // empêcher le démarrage (piège connu si l'appel survient avant que le moteur ait
+  // vraiment commencé à parler). On ne "réveille" donc plus qu'en dernier recours,
+  // après un court délai, et seulement si l'utterance n'a toujours pas démarré.
+  function speechWatchdog(utter, ms){
+    setTimeout(() => {
+      if (!utter._started){
+        try{ speechSynthesis.pause(); speechSynthesis.resume(); }catch(e){}
+        log('⚠ relance forcée (le démarrage était bloqué)', '🔁');
+      }
+    }, ms || 400);
   }
 
   // iOS renvoie souvent 0 voix au premier appel de getVoices() (chargement asynchrone),
@@ -486,16 +481,15 @@
         log(`synthèse vocale : voix chargées=${cachedVoices.length} (${found ? 'ok' : 'aucune après attente'})`);
         try{
           const u = new SpeechSynthesisUtterance('bonjour');
-          const fv = frenchVoice();
-          if (fv) u.voice = fv;
           u.lang = 'fr-FR';
           u.volume = 1;
           u.rate = 2;
-          u.onstart = () => log('synthèse vocale démarrée avec succès', '✅');
+          u._started = false;
+          u.onstart = () => { u._started = true; log('synthèse vocale démarrée avec succès', '✅'); };
           u.onend = () => log('synthèse vocale : fin du test de déblocage');
           u.onerror = (e) => log('⚠ synthèse vocale : erreur au déblocage (' + e.error + ')');
           speechSynthesis.speak(u);
-          speechWatchdog(3000);
+          speechWatchdog(u, 400);
         }catch(e){ log('⚠ synthèse vocale indisponible : ' + e.message); }
       });
     } else {
@@ -598,13 +592,13 @@
   function speak(text, rate){
     if (!('speechSynthesis' in window)) return;
     const utter = new SpeechSynthesisUtterance(text);
-    const fv = frenchVoice();
-    if (fv) utter.voice = fv;
     utter.lang = 'fr-FR';
     utter.rate = rate || 1.1;
+    utter._started = false;
+    utter.onstart = () => { utter._started = true; };
     utter.onerror = (e) => log('⚠ erreur synthèse vocale : ' + e.error);
     speechSynthesis.speak(utter);
-    speechWatchdog(2500);
+    speechWatchdog(utter, 400);
   }
 
   function speakBilan(version){
@@ -616,15 +610,15 @@
     log(`bilan ${version} : ${wrongSpoken} … ${noteSpoken}`, '🔊');
     if (!('speechSynthesis' in window)) return;
     const u1 = new SpeechSynthesisUtterance(wrongSpoken);
-    const fv = frenchVoice();
-    if (fv) u1.voice = fv;
     u1.lang = 'fr-FR';
     u1.rate = 1.3;
+    u1._started = false;
+    u1.onstart = () => { u1._started = true; };
     u1.onerror = (e) => log('⚠ erreur synthèse vocale (questions fausses) : ' + e.error);
     // pause entre l'énoncé des questions fausses et l'énoncé de la note
     u1.onend = () => setTimeout(() => speak(noteSpoken, 1.3), 350);
     speechSynthesis.speak(u1);
-    speechWatchdog(2500);
+    speechWatchdog(u1, 400);
   }
 
   // ---------- clavier piano ----------
