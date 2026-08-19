@@ -567,10 +567,14 @@
     mode = null;
     render();
 
+    // court délai entre l'appui qui termine la dictée et le début de la relecture
     if (finished.type === 'reponses'){
-      // court délai entre l'appui qui termine la dictée et le début de la relecture
       setTimeout(() => {
         playMelody(arr, () => speakBilan(finished.version));
+      }, 500);
+    } else if (finished.type === 'correction'){
+      setTimeout(() => {
+        playMelody(arr, () => log(`relecture du corrigé ${finished.version} terminée`, '🎵'));
       }, 500);
     }
   }
