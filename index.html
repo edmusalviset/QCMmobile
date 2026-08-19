@@ -172,7 +172,7 @@
     display:flex;
   }
   .wkey{
-    width:22mm;
+    width:32mm;
     height:70mm;
     background:linear-gradient(180deg, #f4f4f2, #dcdcda);
     border:1px solid #111;
@@ -199,7 +199,7 @@
 
   .bkey{
     position:absolute; top:0;
-    width:13mm;
+    width:19mm;
     height:46mm;
     background:linear-gradient(180deg, #2a2a2a, #050505);
     border:1px solid #000;
@@ -232,7 +232,7 @@
 
 <div class="legend">
   Identifiant : <b>1 clic</b> = saisir les réponses (vert) · <b>double clic</b> = saisir le corrigé (rouge) · <b>1 clic</b> pour terminer&nbsp;&nbsp;|&nbsp;&nbsp;
-  Clavier : <b>A/B/C/D</b> = réponses A/B/C/D · <b>C♯</b> = non répondu · <b>E</b> = corriger (annule) · <b>G grave</b> = terminer + relecture
+  Clavier : <b>A/B/C/D</b> = réponses A/B/C/D · <b>C♯</b> = non répondu · <b>E</b> = corriger (annule) · <b>G</b> = terminer + relecture
 </div>
 
 <main id="main">
@@ -373,19 +373,22 @@
   }
 
   // ---------- badges V1/V2/V3 : simple clic = réponses, double clic = corrigé ----------
-  const clickTimers = {};
+  // Détection manuelle du double-tap via l'événement "click" uniquement : l'événement
+  // natif "dblclick" n'est pas fiable sur iPad (en partie à cause de touch-action:manipulation
+  // qui désactive le double-tap système dont Safari se sert pour le générer).
+  const clickState = {}; // v -> { count, timer }
   function attachBadgeEvents(el, v){
-    el.addEventListener('click', () => {
-      if (clickTimers[v]) return; // un double-clic est en cours de détection
-      clickTimers[v] = setTimeout(() => {
-        clickTimers[v] = null;
-        onBadgeSingle(v);
-      }, 260);
-    });
-    el.addEventListener('dblclick', () => {
-      clearTimeout(clickTimers[v]);
-      clickTimers[v] = null;
-      onBadgeDouble(v);
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cs = clickState[v] || (clickState[v] = { count: 0, timer: null });
+      cs.count++;
+      if (cs.timer) clearTimeout(cs.timer);
+      cs.timer = setTimeout(() => {
+        if (cs.count >= 2) onBadgeDouble(v);
+        else onBadgeSingle(v);
+        cs.count = 0;
+        cs.timer = null;
+      }, 280);
     });
   }
 
@@ -549,29 +552,28 @@
   }
 
   // ---------- clavier piano ----------
-  // une octave sol→sol (G→G) : touches blanches G A B C D E F G, noires G# A# C# D# F#
-  // notation anglo-saxonne affichée sur les touches ; seul le G grave (premier) termine la dictée
+  // une octave fa→fa (F→F) : touches blanches F G A B C D E F, noires F# G# A# C# D#
+  // notation anglo-saxonne affichée sur les touches ; la touche G termine la dictée
   const WHITE_NOTES = [
+    { note:'F', label:'F' },
     { note:'G', label:'G', action:'END' },
     { note:'A', label:'A', action:'A' },
     { note:'B', label:'B', action:'B' },
     { note:'C', label:'C', action:'C' },
     { note:'D', label:'D', action:'D' },
     { note:'E', label:'E', action:'UNDO' },
-    { note:'F', label:'F' },
-    { note:'G', label:'G' }
+    { note:'F', label:'F' }
   ];
   const BLACK_NOTES = [
-    { after:0, note:'G#', label:'G♯' },
-    { after:1, note:'A#', label:'A♯' },
-    { after:3, note:'C#', label:'C♯', action:'X' },
-    { after:4, note:'D#', label:'D♯' },
-    { after:6, note:'F#', label:'F♯' }
+    { after:0, note:'F#', label:'F♯' },
+    { after:1, note:'G#', label:'G♯' },
+    { after:2, note:'A#', label:'A♯' },
+    { after:4, note:'C#', label:'C♯', action:'X' },
+    { after:5, note:'D#', label:'D♯' }
   ];
   const KEY_FREQ = {
-    'G':392.00, 'G#':415.30, 'A':440.00, 'A#':466.16, 'B':493.88,
-    'C':523.25, 'C#':554.37, 'D':587.33, 'D#':622.25, 'E':659.25,
-    'F':698.46, 'F#':739.99
+    'F':349.23, 'F#':369.99, 'G':392.00, 'G#':415.30, 'A':440.00, 'A#':466.16,
+    'B':493.88, 'C':523.25, 'C#':554.37, 'D':587.33, 'D#':622.25, 'E':659.25
   };
 
   function handleKeyAction(action){
@@ -587,7 +589,7 @@
   function buildPiano(){
     const piano = document.getElementById('piano');
     piano.innerHTML = '';
-    const whiteKeyMM = 22; // largeur d'une touche blanche, en mm (taille réelle)
+    const whiteKeyMM = 32; // largeur CSS d'une touche blanche (compensée pour ≈23mm réels à l'écran)
 
     WHITE_NOTES.forEach((wn) => {
       const el = document.createElement('div');
@@ -608,7 +610,7 @@
       const el = document.createElement('div');
       el.className = 'bkey' + (bn.action ? '' : ' inert');
       el.textContent = bn.label;
-      el.style.left = ((bn.after + 1) * whiteKeyMM - 6.5) + 'mm';
+      el.style.left = ((bn.after + 1) * whiteKeyMM - 9.5) + 'mm';
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         tone(KEY_FREQ[bn.note], 220);
