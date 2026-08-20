@@ -223,6 +223,7 @@
 <header>
   <h1>Correction QCM — tactile</h1>
   <div class="icons">
+    <button id="testVoiceBtn" title="Activer / tester la voix">🔊</button>
     <button id="saveBtn" title="Sauvegarder le corrigé">💾</button>
     <button id="loadBtn" title="Charger un corrigé">📂</button>
     <input id="loadInput" type="file" accept="application/json,.json" style="display:none;">
@@ -697,6 +698,24 @@
   }
 
   // ---------- boutons haut de page ----------
+  document.getElementById('testVoiceBtn').addEventListener('click', () => {
+    // appel aussi direct que possible dans le clic (pas de délai, pas d'attente),
+    // pour donner à iOS le meilleur contexte de "geste utilisateur" possible
+    try{
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      actx.resume();
+    }catch(e){}
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('Test audio activé.');
+    u.lang = 'fr-FR';
+    u.volume = 1;
+    u.rate = 1.2;
+    u.onstart = () => log('voix test : démarrée avec succès', '✅');
+    u.onerror = (e) => log('voix test : erreur (' + e.error + ')');
+    speechSynthesis.speak(u);
+    log('voix test : commande envoyée (bouton pressé directement)', '🔊');
+  });
+
   document.getElementById('resetBtn').addEventListener('click', () => {
     VERSIONS.forEach(v => { state[v].correction = []; state[v].reponses = []; });
     mode = null;
